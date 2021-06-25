@@ -73,6 +73,55 @@ char *substr(char *src, size_t start_index, size_t length)
 // JSON
 #include "olutils/json.h"
 
+long json_obj_find(struct json_object obj, char *key)
+{
+    for(long i = 0; i < obj.size; i++)
+        if(strcmp(obj.pairs[i].key, key) == 0)
+            return i;
+
+    return -1;
+}
+
+void json_obj_add_pair(struct json_object *obj, struct json_pair pair)
+{
+    if(json_obj_find(*obj, pair.key) != -1)
+        return;
+
+    obj->size++;
+    obj->pairs = realloc(obj->pairs, obj->size);
+    obj->pairs[obj->size - 1] = pair;
+}
+
+void json_obj_add(struct json_object *obj, char *key, struct json_value value)
+{
+    json_obj_add_pair(obj, json_new_pair(key, value));
+}
+
+void json_obj_remove(struct json_object *obj, char *key)
+{
+    long pos = json_obj_find(*obj, key);
+    if(pos == -1)
+        return;
+
+    for(; pos < obj->size - 1; pos++)
+        obj->pairs[pos] = obj->pairs[pos + 1];
+
+    obj->size--;
+    obj->pairs = realloc(obj->pairs, obj->size);
+}
+
+struct json_pair json_obj_get_pair(struct json_object obj, char *key)
+{
+    long pos = json_obj_find(obj, key);
+    if(pos == -1)
+        return json_new_pair("OLUTILS_JSON_ERROR", json_new_value(JSON_TYPE_ERROR, "no match"));
+}
+
+struct json_value json_obj_get(struct json_object obj, char *key)
+{
+    return json_obj_get_pair(obj, key).value;
+}
+
 struct json_object json_parse_obj(char *src, size_t *i)
 {
     struct json_object ret = json_null_obj;
@@ -217,7 +266,26 @@ struct json_object json_parse_obj(char *src, size_t *i)
                 key = realloc(key, len);
                 key[len - 1] = '\0';
 
-                printf("%s\n", key);
+                for(*i += 1; *i < strlen(src); *i += 1)
+                {
+                    ch = src[*i];
+
+                    if(ch == ':')
+                        break;
+
+                    switch(ch)
+                    {
+                        case '\v':
+                        case '\n':
+                            break;
+
+                        default:
+                        {
+                            return json_error_obj("expected character ':'");   
+                        } break;
+                    }
+                }
+
             } break;
 
             default:
